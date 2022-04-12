@@ -1,0 +1,53 @@
+pipeline {
+    agent any
+    }
+    environment{
+        ECR_USERNAME = credentials('ECR_USERNAME')
+        ECR_PASSWORD = credentials('ECR_PASSWORD')
+    }
+    stages {
+        stage('docker login') {
+            steps{
+                sh(script: """
+                    aws ecr get-login-password --region us-east-1 | docker login --username $ECR_USERNAME --password-stdin $ECR_PASSWORD 
+                """, returnStdout: true)
+                
+            }
+        }
+
+        stage('git clone') {
+            steps{
+                sh(script: """
+                    git clone git@github.com:ekininal/example-voting-app.git
+                """, returnStdout: true) 
+            }
+        }
+
+        stage('docker build') {
+            steps{
+                sh script: '''
+                #!/bin/bash
+                cd $WORKSPACE/example-voting-app/vote
+                docker build -t vote .
+                '''
+            }
+        }
+
+        stage('docker tag') {
+            steps{
+                sh(script: """
+                    docker tag vote:${BUILD_NUMBER} $ECR_PASSWORD/vote:${BUILD_NUMBER}
+                """)
+            }
+        }
+
+
+        stage('docker push') {
+            steps{
+                sh(script: """
+                    docker push $ECR_PASSWORD/vote:${BUILD_NUMBER}
+                """)
+            }
+        }
+}
+}
